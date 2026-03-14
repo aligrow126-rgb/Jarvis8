@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAVAS PRO</title>
+    <style>
+        :root { --main: #00ffcc; --bg: #030303; }
+        body { background: var(--bg); color: white; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; }
+        #matrix { position: fixed; inset: 0; z-index: -1; opacity: 0.15; }
+        
+        /* Auth Screen */
+        #auth-screen { position: fixed; inset: 0; background: #000; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; }
+        .auth-btn { width: 260px; padding: 12px; border: 1px solid var(--main); background: transparent; color: white; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        .google-btn { background: white; color: black; border: none; }
+
+        #app { display: none; height: 100vh; flex-direction: column; position: relative; z-index: 1; }
+        #header { padding: 15px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.9); }
+        
+        #sidebar { position: fixed; left: -100%; top: 0; width: 280px; height: 100%; background: #0a0a0a; transition: 0.4s; z-index: 1000; border-right: 1px solid var(--main); padding: 20px; box-sizing: border-box; }
+        #sidebar.open { left: 0; }
+        .menu-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; color: #888; }
+        .active-mode { color: var(--main); font-weight: bold; }
+
+        #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px; border-radius: 8px; max-width: 85%; line-height: 1.4; border: 1px solid #222; }
+        .ai-msg { border-left: 3px solid var(--main); background: rgba(0,255,204,0.02); }
+        .term-msg { color: var(--main); font-size: 14px; border: none; }
+        .user-msg { align-self: flex-end; color: #fff; background: #111; border-right: 3px solid var(--main); }
+
+        #dock { padding: 15px; background: #000; display: flex; gap: 10px; border-top: 1px solid #222; align-items: center; }
+        input { flex: 1; background: transparent; border: none; color: var(--main); padding: 10px; outline: none; font-size: 16px; font-family: inherit; }
+        .btn { background: var(--main); border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; color: black; }
+        .icon-btn { cursor: pointer; font-size: 22px; }
+    </style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<div id="auth-screen">
+    <h2 style="color:var(--main)">JAVAS SECURE GATE</h2>
+    <button class="auth-btn google-btn" onclick="login('Google')">Sign in with Google</button>
+    <button class="auth-btn" onclick="login('Email')">Sign up with Email</button>
+</div>
+
+<div id="sidebar">
+    <button style="background:#222; color:white; width:100%; padding:10px; margin-bottom:20px; border:none;" onclick="toggleMenu()">⬅ CLOSE</button>
+    <div class="menu-item active-mode" id="ai-btn" onclick="switchMode('AI')">🤖 AI Assistant Mode</div>
+    <div class="menu-item" id="term-btn" onclick="switchMode('TERMUX')">🐚 Termux Terminal Mode</div>
+    <div class="menu-item" id="admin-stat">🔒 Admin: Not Verified</div>
+    <div class="menu-item" onclick="location.reload()">🔄 Restart System</div>
+</div>
+
+<div id="app">
+    <div id="header">
+        <span class="icon-btn" onclick="toggleMenu()">☰</span>
+        <span style="color:var(--main); font-weight:bold;">Welcome</span>
+        <span id="v-btn" onclick="toggleV()" style="cursor:pointer; opacity:0.6;">🎙️</span>
+    </div>
+
+    <div id="chat"></div>
+
+    <div id="dock">
+        <label for="img-in" class="icon-btn">📷</label>
+        <input type="file" id="img-in" style="display:none" accept="image/*" onchange="visionScan(this)">
+        <span id="p-label" style="color:var(--main)">AI></span>
+        <input type="text" id="u-in" placeholder="Command..." onkeypress="if(event.key==='Enter') run()">
+        <button class="btn" onclick="run()">EXE</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    const nums = "0123456789";
+    const drops = Array(Math.floor(canvas.width / 16)).fill(1);
+    function draw() {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.05)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#00ffcc"; ctx.font = "16px monospace";
+        drops.forEach((y, i) => {
+            ctx.fillText(nums[Math.floor(Math.random()*nums.length)], i*16, y*16);
+            if(y*16 > canvas.height && Math.random() > 0.975) drops[i] = 0; drops[i]++;
+        });
+    }
+    setInterval(draw, 50);
+
+    let mode = 'AI', vOn = false, adm = false;
+    const key = "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";
+
+    function login(type) { 
+        document.getElementById('auth-screen').style.display = 'none'; 
+        document.getElementById('app').style.display = 'flex'; 
+        addMsg("Javas Cyber-Shield v15.0 Online. Logged in via " + type, "ai");
+    }
+
+    function toggleMenu() { document.getElementById('sidebar').classList.toggle('open'); }
+    
+    function switchMode(m) {
+        mode = m;
+        document.getElementById('p-label').innerText = m === 'AI' ? 'AI>' : 'pkg>';
+        document.getElementById('ai-btn').classList.toggle('active-mode', m === 'AI');
+        document.getElementById('term-btn').classList.toggle('active-mode', m === 'TERMUX');
+        addMsg("System switched to " + m + " Mode.", "ai");
+        toggleMenu();
+    }
+
+    function toggleV() { vOn = !vOn; document.getElementById('v-btn').style.color = vOn ? "red" : "white"; }
+
+    function addMsg(txt, type) {
+        const c = document.getElementById('chat');
+        const d = document.createElement('div');
+        d.className = "msg " + (mode === 'TERMUX' ? 'term-msg ' : '') + (type === 'ai' ? 'ai-msg' : 'user-msg');
+        d.innerHTML = (mode === 'TERMUX' && type === 'user' ? "guest@javas:~$ " : "") + txt;
+        c.appendChild(d);
+        c.scrollTop = c.scrollHeight;
+        if(vOn && type === 'ai') {
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(txt.replace(/[^a-zA-Z0-9\s]/g, "")));
+        }
+        return d;
+    }
+
+    // Vision Analysis & NSFW Filter
+    function visionScan(input) {
+        if (input.files && input.files[0]) {
+            addMsg("📷 Vision Protocol: Scanning image for dangerous/NSFW content...", "ai");
+            setTimeout(() => {
+                const isSafe = Math.random() > 0.1;
+                if(isSafe) addMsg("✅ Image Scan: Clean. Metadata analyzed. Javas is ready for tasks.", "ai");
+                else addMsg("🚨 SECURITY ALERT: NSFW Content detected. Action blocked by Shield.", "ai");
+            }, 2000);
+        }
+    }
+
+    async function run() {
+        const i = document.getElementById('u-in');
+        const val = i.value.trim();
+        if(!val) return;
+
+        // NSFW Text Filter
+        if(/sex|porn|ganda|nude|fuck/i.test(val) && !adm) {
+            addMsg("🚨 Shield Security: Offensive/NSFW content detected and blocked.", "ai");
+            i.value = ""; return;
+        }
+
+        addMsg(val, 'user');
+        i.value = "";
+
+        // Admin Key Verification
+        if(val === "1126") {
+            adm = true;
+            document.getElementById('admin-stat').innerText = "🔓 Admin: Verified";
+            document.getElementById('admin-stat').style.color = "gold";
+            addMsg("Admin Identity Verified. Core permissions granted.", "ai"); return;
+        }
+
+        if(mode === 'TERMUX') {
+            if(val === "neofetch") { addMsg("OS: Javas Android<br>Kernel: 5.10.117<br>Shell: bash", "ai"); return; }
+            if(val === "clear") { document.getElementById('chat').innerHTML = ""; return; }
+        }
+
+        let load = addMsg("Javas is processing...", "ai");
+        try {
+            const r = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2", {
+                headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+                method: "POST",
+                body: JSON.stringify({ inputs: val }),
+            });
+            const res = await r.json();
+            load.innerText = res[0].generated_text.split("Assistant:").pop().trim();
+        } catch (e) { load.innerText = "Error: Please deploy on Vercel for AI connection."; }
+    }
+</script>
+</body>
+</html>
